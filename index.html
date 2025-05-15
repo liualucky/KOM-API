@@ -1,0 +1,166 @@
+<template>
+  <div class="container">
+    <!-- 输入区域 -->
+    <div class="input-section">
+      <h2>设计参数输入</h2>
+      
+      <!-- 分液罐参数 -->
+      <div class="param-group">
+        <h3>分液罐参数 (API 521)</h3>
+        <div class="input-row">
+          <label>最大气体流量 (m³/s):</label>
+          <input v-model.number="koParams.Qv" type="number" step="0.1">
+        </div>
+        <div class="input-row">
+          <label>液体密度 (kg/m³):</label>
+          <input v-model.number="koParams.rhoL" type="number">
+        </div>
+        <div class="input-row">
+          <label>气体密度 (kg/m³):</label>
+          <input v-model.number="koParams.rhoV" type="number" step="0.1">
+        </div>
+      </div>
+
+      <!-- 水封罐参数 -->
+      <div class="param-group">
+        <h3>水封罐参数 (API 537)</h3>
+        <div class="input-row">
+          <label>系统最大压力 (barg):</label>
+          <input v-model.number="sealParams.Pmax" type="number" step="0.1">
+        </div>
+        <div class="input-row">
+          <label>密封液密度 (kg/m³):</label>
+          <input v-model.number="sealParams.rhoL" type="number">
+        </div>
+      </div>
+    </div>
+
+    <!-- 输出区域 -->
+    <div class="output-section">
+      <h2>计算结果输出</h2>
+      
+      <!-- 分液罐计算结果 -->
+      <div class="result-group">
+        <h3>分液罐设计结果</h3>
+        <div class="calculation-step">
+          <p>液滴沉降速度计算:
+            $$ U_v = 0.15 \sqrt{\frac{\rho_l - \rho_v}{\rho_v} \cdot g \cdot d_p} $$
+            代入值: 0.15 * √(({{koParams.rhoL}} - {{koParams.rhoV}})/{{koParams.rhoV}} * 9.81 * 150e-6)
+            = {{koResults.Uv.toFixed(3)}} m/s [5][6]
+          </p>
+        </div>
+        <div class="calculation-step">
+          <p>气相截面积:
+            $$ A_{cs} = \frac{Q_v}{U_v} = \frac{ {{koParams.Qv}} }{ {{koResults.Uv.toFixed(3)}} } 
+            = {{koResults.Acs.toFixed(3)}} m² [5]
+          </p>
+        </div>
+        <div class="final-result">
+          推荐直径: {{koResults.D.toFixed(2)}} m (圆整至 {{Math.ceil(koResults.D*10)/10}} m)
+        </div>
+      </div>
+
+      <!-- 水封罐计算结果 -->
+      <div class="result-group">
+        <h3>水封罐设计结果</h3>
+        <div class="calculation-step">
+          <p>理论密封高度:
+            $$ h_{seal} = \frac{P_{max} \times 100}{ \rho_l \cdot 9.81 } + 0.15 $$
+            = ({{sealParams.Pmax}}×100)/({{sealParams.rhoL}}×9.81) + 0.15
+            = {{sealResults.h.toFixed(2)}} m [6][9]
+          </p>
+        </div>
+        <div class="final-result">
+          最终密封高度: {{Math.ceil(sealResults.h*100)/100}} m
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+export default {
+  data() {
+    return {
+      koParams: { Qv: 12.5, rhoL: 780, rhoV: 4.2 },
+      sealParams: { Pmax: 2.5, rhoL: 998 }
+    }
+  },
+  computed: {
+    koResults() {
+      const g = 9.81
+      const dp = 150e-6
+      const Uv = 0.15 * Math.sqrt(
+        ((this.koParams.rhoL - this.koParams.rhoV)/this.koParams.rhoV) * g * dp
+      )
+      const Acs = this.koParams.Qv / Uv
+      return {
+        Uv: Uv || 0,
+        Acs: Acs || 0,
+        D: Math.sqrt(4 * Acs / Math.PI) || 0
+      }
+    },
+    sealResults() {
+      return {
+        h: (this.sealParams.Pmax * 100) / (this.sealParams.rhoL * 9.81) + 0.15
+      }
+    }
+  }
+}
+</script>
+
+<style>
+.container {
+  display: grid;
+  grid-template-columns: 1fr 1.5fr;
+  gap: 2rem;
+  max-width: 1200px;
+  margin: 2rem auto;
+  padding: 20px;
+}
+
+.input-section, .output-section {
+  background: #f5f7fa;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.param-group {
+  margin-bottom: 2rem;
+}
+
+.input-row {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  align-items: center;
+  margin: 10px 0;
+}
+
+input {
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.calculation-step {
+  background: white;
+  padding: 15px;
+  margin: 10px 0;
+  border-left: 4px solid #409eff;
+  border-radius: 4px;
+}
+
+.final-result {
+  font-size: 1.2em;
+  color: #67C23A;
+  font-weight: bold;
+  margin-top: 1rem;
+}
+
+h2, h3 {
+  color: #303133;
+  border-bottom: 2px solid #eee;
+  padding-bottom: 0.5em;
+}
+</style>
