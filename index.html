@@ -1,166 +1,218 @@
-<template>
-  <div class="container">
-    <!-- 输入区域 -->
-    <div class="input-section">
-      <h2>设计参数输入</h2>
-      
-      <!-- 分液罐参数 -->
-      <div class="param-group">
-        <h3>分液罐参数 (API 521)</h3>
-        <div class="input-row">
-          <label>最大气体流量 (m³/s):</label>
-          <input v-model.number="koParams.Qv" type="number" step="0.1">
-        </div>
-        <div class="input-row">
-          <label>液体密度 (kg/m³):</label>
-          <input v-model.number="koParams.rhoL" type="number">
-        </div>
-        <div class="input-row">
-          <label>气体密度 (kg/m³):</label>
-          <input v-model.number="koParams.rhoV" type="number" step="0.1">
-        </div>
-      </div>
-
-      <!-- 水封罐参数 -->
-      <div class="param-group">
-        <h3>水封罐参数 (API 537)</h3>
-        <div class="input-row">
-          <label>系统最大压力 (barg):</label>
-          <input v-model.number="sealParams.Pmax" type="number" step="0.1">
-        </div>
-        <div class="input-row">
-          <label>密封液密度 (kg/m³):</label>
-          <input v-model.number="sealParams.rhoL" type="number">
-        </div>
-      </div>
-    </div>
-
-    <!-- 输出区域 -->
-    <div class="output-section">
-      <h2>计算结果输出</h2>
-      
-      <!-- 分液罐计算结果 -->
-      <div class="result-group">
-        <h3>分液罐设计结果</h3>
-        <div class="calculation-step">
-          <p>液滴沉降速度计算:
-            $$ U_v = 0.15 \sqrt{\frac{\rho_l - \rho_v}{\rho_v} \cdot g \cdot d_p} $$
-            代入值: 0.15 * √(({{koParams.rhoL}} - {{koParams.rhoV}})/{{koParams.rhoV}} * 9.81 * 150e-6)
-            = {{koResults.Uv.toFixed(3)}} m/s [5][6]
-          </p>
-        </div>
-        <div class="calculation-step">
-          <p>气相截面积:
-            $$ A_{cs} = \frac{Q_v}{U_v} = \frac{ {{koParams.Qv}} }{ {{koResults.Uv.toFixed(3)}} } 
-            = {{koResults.Acs.toFixed(3)}} m² [5]
-          </p>
-        </div>
-        <div class="final-result">
-          推荐直径: {{koResults.D.toFixed(2)}} m (圆整至 {{Math.ceil(koResults.D*10)/10}} m)
-        </div>
-      </div>
-
-      <!-- 水封罐计算结果 -->
-      <div class="result-group">
-        <h3>水封罐设计结果</h3>
-        <div class="calculation-step">
-          <p>理论密封高度:
-            $$ h_{seal} = \frac{P_{max} \times 100}{ \rho_l \cdot 9.81 } + 0.15 $$
-            = ({{sealParams.Pmax}}×100)/({{sealParams.rhoL}}×9.81) + 0.15
-            = {{sealResults.h.toFixed(2)}} m [6][9]
-          </p>
-        </div>
-        <div class="final-result">
-          最终密封高度: {{Math.ceil(sealResults.h*100)/100}} m
-        </div>
-      </div>
-    </div>
-  </div>
-</template>
-
-<script>
-export default {
-  data() {
-    return {
-      koParams: { Qv: 12.5, rhoL: 780, rhoV: 4.2 },
-      sealParams: { Pmax: 2.5, rhoL: 998 }
-    }
-  },
-  computed: {
-    koResults() {
-      const g = 9.81
-      const dp = 150e-6
-      const Uv = 0.15 * Math.sqrt(
-        ((this.koParams.rhoL - this.koParams.rhoV)/this.koParams.rhoV) * g * dp
-      )
-      const Acs = this.koParams.Qv / Uv
-      return {
-        Uv: Uv || 0,
-        Acs: Acs || 0,
-        D: Math.sqrt(4 * Acs / Math.PI) || 0
-      }
-    },
-    sealResults() {
-      return {
-        h: (this.sealParams.Pmax * 100) / (this.sealParams.rhoL * 9.81) + 0.15
-      }
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>立式水封缶及立式分液缶計算工具 (API 537 & API 521)</title>
+<style>
+  body {
+    font-family: "Microsoft JhengHei", Arial, sans-serif;
+    background: #f0f2f5;
+    margin: 0; padding: 0;
+    color: #2c3e50;
+  }
+  .container {
+    max-width: 960px;
+    margin: 2rem auto;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgb(0 0 0 / 0.1);
+    padding: 24px;
+  }
+  h1 {
+    text-align: center;
+    color: #409eff;
+    margin-bottom: 1rem;
+  }
+  h2 {
+    border-bottom: 2px solid #409eff;
+    padding-bottom: 0.3rem;
+    margin-bottom: 1rem;
+  }
+  label {
+    display: block;
+    margin: 0.6rem 0 0.2rem;
+    font-weight: 600;
+  }
+  input[type=number] {
+    width: 100%;
+    padding: 8px 10px;
+    font-size: 1rem;
+    border: 1px solid #dcdfe6;
+    border-radius: 4px;
+    box-sizing: border-box;
+    transition: border-color 0.3s ease;
+  }
+  input[type=number]:focus {
+    border-color: #409eff;
+    outline: none;
+    box-shadow: 0 0 5px #409eff;
+  }
+  .grid-two-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+  }
+  .section {
+    background: #f9fafb;
+    padding: 20px;
+    border-radius: 6px;
+  }
+  button {
+    margin-top: 1.5rem;
+    background-color: #409eff;
+    border: none;
+    color: white;
+    font-weight: 600;
+    padding: 12px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 1rem;
+    width: 100%;
+  }
+  button:hover {
+    background-color: #66b1ff;
+  }
+  .output {
+    margin-top: 1rem;
+    background: white;
+    padding: 16px 20px;
+    border-radius: 6px;
+    box-shadow: 0 1px 6px rgb(0 0 0 / 0.1);
+    font-family: "Source Code Pro", monospace;
+    white-space: pre-wrap;
+    color: #303133;
+  }
+  .error {
+    margin-top: 1rem;
+    color: #f56c6c;
+    font-weight: 700;
+    background: #fef0f0;
+    border: 1px solid #f56c6c;
+    padding: 12px;
+    border-radius: 6px;
+  }
+  @media(max-width:720px) {
+    .grid-two-cols {
+      grid-template-columns: 1fr;
     }
   }
-}
-</script>
-
-<style>
-.container {
-  display: grid;
-  grid-template-columns: 1fr 1.5fr;
-  gap: 2rem;
-  max-width: 1200px;
-  margin: 2rem auto;
-  padding: 20px;
-}
-
-.input-section, .output-section {
-  background: #f5f7fa;
-  padding: 20px;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.param-group {
-  margin-bottom: 2rem;
-}
-
-.input-row {
-  display: grid;
-  grid-template-columns: 160px 1fr;
-  align-items: center;
-  margin: 10px 0;
-}
-
-input {
-  padding: 8px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-}
-
-.calculation-step {
-  background: white;
-  padding: 15px;
-  margin: 10px 0;
-  border-left: 4px solid #409eff;
-  border-radius: 4px;
-}
-
-.final-result {
-  font-size: 1.2em;
-  color: #67C23A;
-  font-weight: bold;
-  margin-top: 1rem;
-}
-
-h2, h3 {
-  color: #303133;
-  border-bottom: 2px solid #eee;
-  padding-bottom: 0.5em;
-}
 </style>
+</head>
+<body>
+  <div class="container">
+    <h1>立式水封缶及立式分液缶自動計算工具</h1>
+    <div class="grid-two-cols">
+      <section class="section" aria-label="輸入參數區">
+        <h2>輸入參數</h2>
+        <form id="calcForm" onsubmit="return false;">
+          <fieldset>
+            <legend><strong>分液罐參數 (API 521)</strong></legend>
+            <label for="Qv">最大氣體流量 Qv (m³/s)</label>
+            <input type="number" id="Qv" min="0.01" step="0.01" value="12.5" required />
+            <label for="rhoL">液體密度 ρ<sub>l</sub> (kg/m³)</label>
+            <input type="number" id="rhoL" min="1" step="1" value="780" required />
+            <label for="rhoV">氣體密度 ρ<sub>v</sub> (kg/m³)</label>
+            <input type="number" id="rhoV" min="0.001" step="0.001" value="4.2" required />
+          </fieldset>
+          <fieldset style="margin-top:1rem;">
+            <legend><strong>水封罐參數 (API 537)</strong></legend>
+            <label for="Pmax">系統最大壓力 P<sub>max</sub> (barg)</label>
+            <input type="number" id="Pmax" min="0" step="0.01" value="2.5" required />
+            <label for="sealRhoL">密封液密度 ρ<sub>seal</sub> (kg/m³)</label>
+            <input type="number" id="sealRhoL" min="1" step="1" value="998" required />
+          </fieldset>
+          <button type="button" onclick="calculate()">開始計算</button>
+        </form>
+      </section>
+
+      <section class="section" aria-label="計算結果區">
+        <h2>計算結果</h2>
+        <pre id="output" class="output" aria-live="polite" aria-atomic="true">請輸入參數並點擊「開始計算」</pre>
+      </section>
+    </div>
+  </div>
+
+<script>
+  function calculate() {
+    const Qv = parseFloat(document.getElementById('Qv').value);
+    const rhoL = parseFloat(document.getElementById('rhoL').value);
+    const rhoV = parseFloat(document.getElementById('rhoV').value);
+    const Pmax = parseFloat(document.getElementById('Pmax').value);
+    const sealRhoL = parseFloat(document.getElementById('sealRhoL').value);
+
+    const outputEl = document.getElementById('output');
+
+    // 输入校验
+    if (
+      isNaN(Qv) || Qv <= 0 ||
+      isNaN(rhoL) || rhoL <= 0 ||
+      isNaN(rhoV) || rhoV <= 0 ||
+      rhoV >= rhoL ||
+      isNaN(Pmax) || Pmax < 0 ||
+      isNaN(sealRhoL) || sealRhoL <= 0
+    ) {
+      outputEl.textContent = '錯誤：請確保所有輸入為正數且氣體密度小於液體密度。';
+      outputEl.classList.add('error');
+      return;
+    } else {
+      outputEl.classList.remove('error');
+    }
+
+    // 常數
+    const g = 9.81; // 重力加速度 m/s²
+    const dp = 150e-6; // 液滴直徑 150 微米
+
+    // 分液罐計算 (API 521)
+    // 液滴沉降速度 Uv
+    const Uv = 0.15 * Math.sqrt(((rhoL - rhoV) / rhoV) * g * dp);
+
+    // 氣相截面積 Acs
+    const Acs = Qv / Uv;
+
+    // 分液罐直徑 D
+    const D = Math.sqrt((4 * Acs) / Math.PI);
+    const DRounded = Math.ceil(D * 10) / 10; // 圓整到0.1米
+
+    // 水封罐計算 (API 537)
+    // 壓力轉換 barg -> Pa (1 bar = 1e5 Pa)
+    const PmaxPa = Pmax * 1e5;
+
+    // 密封高度 h_seal = PmaxPa / (rho * g) + 安全余量0.15m
+    const hSeal = PmaxPa / (sealRhoL * g) + 0.15;
+    const hSealRounded = Math.ceil(hSeal * 100) / 100; // 圓整到0.01米
+
+    // 組合輸出文字，包含計算過程與結果
+    const resultText = `
+【分液罐設計計算 (API 521)】
+1. 液滴沉降速度 Uv 計算公式：
+   Uv = 0.15 × √[(ρl - ρv) / ρv × g × dp]
+   代入值：0.15 × √[(${rhoL} - ${rhoV}) / ${rhoV} × ${g} × ${dp}] = ${Uv.toFixed(4)} m/s
+
+2. 氣相截面積 Acs 計算公式：
+   Acs = Qv / Uv
+   代入值：${Qv} / ${Uv.toFixed(4)} = ${Acs.toFixed(4)} m²
+
+3. 分液罐直徑 D 計算公式：
+   D = √(4 × Acs / π)
+   計算得：${D.toFixed(3)} m
+   建議圓整至：${DRounded.toFixed(1)} m
+
+------------------------------
+
+【水封罐設計計算 (API 537)】
+1. 密封高度 h_seal 計算公式：
+   h_seal = (Pmax × 10⁵) / (ρseal × g) + 0.15
+   代入值：(${Pmax} × 10⁵) / (${sealRhoL} × ${g}) + 0.15 = ${hSeal.toFixed(3)} m
+   建議圓整至：${hSealRounded.toFixed(2)} m
+
+------------------------------
+
+以上計算依據API 521附錄C.3與API 537第6章規範完成。
+    `.trim();
+
+    outputEl.textContent = resultText;
+  }
+</script>
+</body>
+</html>
